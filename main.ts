@@ -33,12 +33,16 @@ export default class RedactorPlugin extends Plugin {
             (_, text) => this.settings.redactionSymbol.repeat(text.length)
           );
 
-          const currentFilePath = view.file.path;
-          const redactedFilePath = path.join(redactedFolderPath, currentFilePath);
+          if (view.file) {
+            const currentFilePath = view.file.path;
+            const redactedFilePath = path.join(redactedFolderPath, currentFilePath);
 
-          await this.createFolderIfNotExists(path.dirname(redactedFilePath));
-          await fs.promises.writeFile(redactedFilePath, redactedFileContent, 'utf-8');
-          new Notice(`Redacted text extracted to ${redactedFilePath}`);
+            await this.createFolderIfNotExists(path.dirname(redactedFilePath));
+            await fs.promises.writeFile(redactedFilePath, redactedFileContent, 'utf-8');
+            new Notice(`Redacted text extracted to ${redactedFilePath}`);
+          } else {
+            new Notice('No active file found.');
+          }
         } else {
           new Notice('Please set the redacted folder path in the plugin settings.');
         }
