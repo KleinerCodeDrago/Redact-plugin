@@ -62,9 +62,10 @@ export default class RedactorPlugin extends Plugin {
             // If text is selected, wrap it with the redaction marker
             editor.replaceSelection(`${marker}${selectedText}${marker}`);
           } else {
-            // If no text is selected, insert a single redaction marker at the cursor position
+            // If no text is selected, insert a single redaction marker before the cursor position
             const cursor = editor.getCursor();
-            editor.replaceRange(marker, cursor);
+            editor.replaceRange(marker, { line: cursor.line, ch: cursor.ch }, { line: cursor.line, ch: cursor.ch });
+            editor.setCursor({ line: cursor.line, ch: cursor.ch + marker.length });
           }
         },
         hotkeys: [
@@ -77,6 +78,7 @@ export default class RedactorPlugin extends Plugin {
   
       this.addSettingTab(new RedactorSettingTab(this.app, this));
     }
+  
 
   async createFolderIfNotExists(folderPath: string): Promise<void> {
     if (!await this.exists(folderPath)) {
@@ -150,7 +152,7 @@ class RedactorSettingTab extends PluginSettingTab {
           this.plugin.settings.redactionMarker = value;
           await this.plugin.saveSettings();
         }));
-		
+
     new Setting(containerEl)
       .setName('Redaction Shortcut')
       .setDesc('Shortcut to toggle the redaction marker')
