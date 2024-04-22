@@ -59,10 +59,17 @@ export default class RedactorPlugin extends Plugin {
           const marker = this.settings.redactionMarker;
   
           if (selectedText) {
-            // If text is selected, wrap it with the redaction marker
-            editor.replaceSelection(`${marker}${selectedText}${marker}`);
+            const selectedLines = selectedText.split('\n');
+            const wrappedLines = selectedLines.map(line => {
+              if (line.trim() !== '') {
+                return `${marker}${line}${marker}`;
+              } else {
+                return line;
+              }
+            });
+            const wrappedText = wrappedLines.join('\n');
+            editor.replaceSelection(wrappedText);
           } else {
-            // If no text is selected, insert a single redaction marker before the cursor position
             const cursor = editor.getCursor();
             editor.replaceRange(marker, { line: cursor.line, ch: cursor.ch }, { line: cursor.line, ch: cursor.ch });
             editor.setCursor({ line: cursor.line, ch: cursor.ch + marker.length });
