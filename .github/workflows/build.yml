@@ -40,18 +40,37 @@ jobs:
     - name: Create ZIP file
       run: zip -r redact-and-extract.zip redact-and-extract
 
+    - name: Get version from manifest.json
+      id: get_version
+      run: echo "::set-output name=version::$(jq -r '.version' manifest.json)"
+
+    - name: Check if release already exists
+      id: check_release
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const version = '${{ steps.get_version.outputs.version }}';
+          const releases = await github.rest.repos.listReleases({
+            owner: context.repo.owner,
+            repo: context.repo.repo
+          });
+          const releaseExists = releases.data.some(release => release.tag_name === version);
+          return releaseExists;
+
     - name: Create release
+      if: ${{ steps.check_release.outputs.result == 'false' }}
       id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
       with:
-        tag_name: ${{ github.run_number }}
-        release_name: Release ${{ github.run_number }}
+        tag_name: ${{ steps.get_version.outputs.version }}
+        release_name: Release ${{ steps.get_version.outputs.version }}
         draft: false
         prerelease: false
 
     - name: Upload plugin ZIP
+      if: ${{ steps.check_release.outputs.result == 'false' }}
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
@@ -62,6 +81,7 @@ jobs:
         asset_content_type: application/zip
 
     - name: Upload main.js
+      if: ${{ steps.check_release.outputs.result == 'false' }}
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
@@ -72,6 +92,7 @@ jobs:
         asset_content_type: application/javascript
   
     - name: Upload manifest.json
+      if: ${{ steps.check_release.outputs.result == 'false' }}
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
@@ -82,6 +103,7 @@ jobs:
         asset_content_type: application/json
 
     - name: Upload styles.css
+      if: ${{ steps.check_release.outputs.result == 'false' }}
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
