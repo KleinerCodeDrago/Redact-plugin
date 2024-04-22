@@ -3,16 +3,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 interface RedactorPluginSettings {
-  redactedFolderPath: string;
-  redactionSymbol: string;
-  redactionMarker: string;
+    redactedFolderPath: string;
+    redactionSymbol: string;
+    redactionMarker: string;
+    redactionShortcut: string;
 }
 
 const DEFAULT_SETTINGS: RedactorPluginSettings = {
-  redactedFolderPath: '',
-  redactionSymbol: '█',
-  redactionMarker: '==',
-}
+    redactedFolderPath: '',
+    redactionSymbol: '█',
+    redactionMarker: '==',
+    redactionShortcut: 'Ctrl+Shift+R',
+  }
 
 export default class RedactorPlugin extends Plugin {
   settings: RedactorPluginSettings;
@@ -49,8 +51,32 @@ export default class RedactorPlugin extends Plugin {
       }
     });
 
-    this.addSettingTab(new RedactorSettingTab(this.app, this));
-  }
+    this.addCommand({
+        id: 'toggle-redaction-marker',
+        name: 'Toggle Redaction Marker',
+        editorCallback: (editor: Editor) => {
+          const selectedText = editor.getSelection();
+          const marker = this.settings.redactionMarker;
+  
+          if (selectedText) {
+            // If text is selected, wrap it with the redaction marker
+            editor.replaceSelection(`${marker}${selectedText}${marker}`);
+          } else {
+            // If no text is selected, insert a single redaction marker at the cursor position
+            const cursor = editor.getCursor();
+            editor.replaceRange(marker, cursor);
+          }
+        },
+        hotkeys: [
+          {
+            modifiers: ['Ctrl', 'Shift'],
+            key: 'R',
+          },
+        ],
+      });
+  
+      this.addSettingTab(new RedactorSettingTab(this.app, this));
+    }
 
   async createFolderIfNotExists(folderPath: string): Promise<void> {
     if (!await this.exists(folderPath)) {
@@ -122,6 +148,17 @@ class RedactorSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.redactionMarker)
         .onChange(async (value) => {
           this.plugin.settings.redactionMarker = value;
+          await this.plugin.saveSettings();
+        }));
+		
+    new Setting(containerEl)
+      .setName('Redaction Shortcut')
+      .setDesc('Shortcut to toggle the redaction marker')
+      .addText(text => text
+        .setPlaceholder('Enter the redaction shortcut')
+        .setValue(this.plugin.settings.redactionShortcut)
+        .onChange(async (value) => {
+          this.plugin.settings.redactionShortcut = value;
           await this.plugin.saveSettings();
         }));
   }
