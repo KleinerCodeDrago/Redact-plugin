@@ -1,14 +1,15 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
-import { normalize } from 'path';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder } from 'obsidian';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface RedactorPluginSettings {
-  redactedVaultPath: string;
+  redactedFolderPath: string;
   redactionSymbol: string;
   redactionMarker: string;
 }
 
 const DEFAULT_SETTINGS: RedactorPluginSettings = {
-  redactedVaultPath: '',
+  redactedFolderPath: '',
   redactionSymbol: '█',
   redactionMarker: '==',
 }
@@ -24,30 +25,42 @@ export default class RedactorPlugin extends Plugin {
       name: 'Redact and Extract',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         const fileContent = editor.getValue();
-        const redactedVaultPath = normalize(this.settings.redactedVaultPath);
+        const redactedFolderPath = this.settings.redactedFolderPath;
 
-        if (redactedVaultPath) {
+        if (redactedFolderPath) {
           const redactedFileContent = fileContent.replace(
             new RegExp(`${this.settings.redactionMarker}(.*?)${this.settings.redactionMarker}`, 'gs'),
             (_, text) => this.settings.redactionSymbol.repeat(text.length)
           );
 
-          const redactedFilePath = `${redactedVaultPath}/${view.file.name}`;
+          const currentFilePath = view.file.path;
+          const redactedFilePath = path.join(redactedFolderPath, currentFilePath);
 
-          try {
-            await this.app.vault.adapter.write(redactedFilePath, redactedFileContent);
-            new Notice(`Redacted text extracted to ${redactedFilePath}`);
-          } catch (error) {
-            console.error('Error extracting redacted text:', error);
-            new Notice('An error occurred while extracting the redacted text. Please check the console for more details.');
-          }
+          await this.createFolderIfNotExists(path.dirname(redactedFilePath));
+          await fs.promises.writeFile(redactedFilePath, redactedFileContent, 'utf-8');
+          new Notice(`Redacted text extracted to ${redactedFilePath}`);
         } else {
-          new Notice('Please set the redacted vault path in the plugin settings.');
+          new Notice('Please set the redacted folder path in the plugin settings.');
         }
       }
     });
 
     this.addSettingTab(new RedactorSettingTab(this.app, this));
+  }
+
+  async createFolderIfNotExists(folderPath: string): Promise<void> {
+    if (!await this.exists(folderPath)) {
+      await fs.promises.mkdir(folderPath, { recursive: true });
+    }
+  }
+
+  async exists(path: string): Promise<boolean> {
+    try {
+      await fs.promises.access(path);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   onunload() {
@@ -76,13 +89,13 @@ class RedactorSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName('Redacted Vault Path')
-      .setDesc('Absolute path to the vault where redacted text will be extracted')
+      .setName('Redacted Folder Path')
+      .setDesc('Path to the folder where redacted files will be saved')
       .addText(text => text
-        .setPlaceholder('Enter the redacted vault path')
-        .setValue(this.plugin.settings.redactedVaultPath)
+        .setPlaceholder('Enter the redacted folder path')
+        .setValue(this.plugin.settings.redactedFolderPath)
         .onChange(async (value) => {
-          this.plugin.settings.redactedVaultPath = value;
+          this.plugin.settings.redactedFolderPath = value;
           await this.plugin.saveSettings();
         }));
 
