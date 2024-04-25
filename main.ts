@@ -50,6 +50,38 @@ export default class RedactorPlugin extends Plugin {
         }
       }
     });
+      this.addCommand({
+        id: 'sync-from-redacted',
+        name: 'Sync from Redacted File',
+        editorCallback: async (editor: Editor, view: MarkdownView) => {
+          if (view.file) {
+            const currentFilePath = view.file.path;
+            const redactedFilePath = path.join(this.settings.redactedFolderPath, currentFilePath);
+  
+            try {
+              const redactedFileContent = await fs.promises.readFile(redactedFilePath, 'utf-8');
+              const unredactedFileContent = editor.getValue();
+  
+              const redactedParts = unredactedFileContent.match(new RegExp(`${this.settings.redactionMarker}.*?${this.settings.redactionMarker}`, 'gs')) || [];
+              let syncedContent = redactedFileContent;
+  
+              redactedParts.forEach((part) => {
+                const redactedPart = part.replace(new RegExp(`${this.settings.redactionMarker}`, 'g'), '');
+                const redactionSymbols = this.settings.redactionSymbol.repeat(redactedPart.length);
+                syncedContent = syncedContent.replace(redactionSymbols, part);
+              });
+  
+              editor.setValue(syncedContent);
+              new Notice('Synced changes from the redacted file.');
+            } catch (error) {
+              new Notice('Failed to sync changes from the redacted file.');
+            }
+          } else {
+            new Notice('No active file found.');
+          }
+        }
+      });
+  
 
     this.addCommand({
         id: 'toggle-redaction-marker',
